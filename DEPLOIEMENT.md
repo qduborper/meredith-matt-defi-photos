@@ -30,14 +30,35 @@ dig +short mm.dubprod.fr
 
 ## 2. Dossiers sur le serveur
 
+Remplacez `ubuntu` par votre utilisateur si besoin.
+
 ```bash
-sudo mkdir -p /var/www/defi-photo /var/lib/defi-photo
-sudo chown -R www-data:www-data /var/www/defi-photo /var/lib/defi-photo
+sudo mkdir -p /var/www /var/lib/defi-photo
+sudo git clone https://github.com/qduborper/meredith-matt-defi-photos.git /var/www/defi-photo
+
+# Sans ça : « EACCES: permission denied, mkdir node_modules ». Le clone en
+# sudo appartient à root, alors que npm doit tourner en utilisateur normal.
+sudo chown -R ubuntu:ubuntu /var/www/defi-photo /var/lib/defi-photo
 ```
 
 `/var/lib/defi-photo` contient la base SQLite, les photos et les miniatures.
 Il est **hors du dossier de build** : un redéploiement ne peut pas l'écraser.
 C'est le seul dossier à sauvegarder.
+
+**Ne lancez jamais `sudo npm install`** : les scripts de post-installation
+s'exécuteraient en root. Et si Node vient de nvm, `sudo npm` échoue de toute
+façon avec `command not found`, nvm vivant dans votre dossier personnel.
+
+### Node joignable par systemd
+
+Si Node est installé par **nvm**, il se trouve dans `/home/<user>/.nvm/...`,
+un chemin que systemd ne connaît pas et qui change à chaque mise à jour de nvm.
+Un lien symbolique fixe règle le problème :
+
+```bash
+sudo ln -sf "$(which node)" /usr/local/bin/node
+/usr/local/bin/node --version   # doit répondre v20.9 ou plus
+```
 
 ## 3. Secrets
 
@@ -94,17 +115,31 @@ sur les ports 80/443 : gardez celui que votre autre projet utilise déjà.
 
 ## 6. Premier déploiement
 
-```bash
-./deploy/deployer.sh
-```
+Depuis le dossier cloné, **en utilisateur normal, sans sudo** :
 
-Le script envoie les sources par rsync (en excluant `data/` et `.env`),
-installe les dépendances, applique les migrations, construit et redémarre.
+```bash
+cd /var/www/defi-photo
+npm ci
+DATA_DIR=/var/lib/defi-photo npm run build
+```
 
 Le build tourne **sur le serveur**, volontairement : c'est le seul moyen d'avoir
 `better-sqlite3` et `sharp` compilés pour la bonne architecture, la CLI Prisma
 présente pour les migrations et `tsx` pour le script de purge. Prévoyez ~1,5 Go
 de RAM disponible ; si le VPS est juste, ajoutez temporairement du swap.
+
+`npm run build` applique aussi les migrations Prisma.
+
+Pour les mises à jour suivantes :
+
+```bash
+cd /var/www/defi-photo && git pull && npm ci \
+  && DATA_DIR=/var/lib/defi-photo npm run build \
+  && sudo systemctl restart defi-photo
+```
+
+> `deploy/deployer.sh` fait la même chose en poussant depuis votre machine par
+> rsync. Il ne sert que si vous préférez ne pas cloner le dépôt sur le serveur.
 
 Puis, une seule fois, charger les 22 défis de base :
 
@@ -223,5 +258,9 @@ personnelles ailleurs, ni dans le dossier de build, ni en base externe.
 | L'appareil photo ne s'ouvre pas | Pas de HTTPS. Les navigateurs l'exigent pour la caméra. |
 | Tout le monde bloqué sur `/admin/login` | `X-Forwarded-For` absent de la config du proxy (voir §5) |
 | `Error: ADMIN_PASSWORD manquant` | `/etc/defi-photo.env` absent, illisible, ou `EnvironmentFile` mal renseigné |
+| `EACCES` sur `node_modules` | Dossier cloné en root : `sudo chown -R ubuntu:ubuntu /var/www/defi-photo` |
+| `sudo: npm: command not found` | Node vient de nvm. Ne pas utiliser sudo pour npm (voir §2) |
+| Service `status=203/EXEC` | `/usr/local/bin/node` absent : refaire le lien symbolique du §2 |
+| Service `status=200/CHDIR` | `WorkingDirectory` ne correspond pas au dossier réellement cloné |
 | Photos disparues après un déploiement | `DATA_DIR` non défini : les données sont allées dans le dossier de build |
 | Build tué par manque de mémoire | Ajouter du swap le temps du build |

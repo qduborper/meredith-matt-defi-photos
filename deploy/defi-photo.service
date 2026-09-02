@@ -5,7 +5,12 @@
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now defi-photo
 #
-# Adapter User, WorkingDirectory et le chemin de node à votre VPS.
+# PRÉREQUIS — Node doit être joignable depuis un chemin stable. Si Node est
+# installé par nvm (donc dans /home/<user>/.nvm), systemd ne le trouvera pas :
+#
+#   sudo ln -sf "$(which node)" /usr/local/bin/node
+#
+# À vérifier avant d'installer : User, Group et WorkingDirectory.
 
 [Unit]
 Description=Defi Photo - mariage Meredith & Matthieu
@@ -13,8 +18,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+
+# L'utilisateur qui possède le dossier de l'app et le dossier de données.
+# Pas www-data si Node vient de nvm : www-data ne peut pas lire /home/ubuntu.
+User=ubuntu
+Group=ubuntu
 
 WorkingDirectory=/var/www/defi-photo
 
@@ -24,25 +32,28 @@ Environment=NODE_ENV=production
 Environment=PORT=3100
 
 # Photos, miniatures et base SQLite. Hors du dossier de build, pour survivre
-# aux redéploiements.
+# aux redéploiements. Doit appartenir à l'utilisateur ci-dessus.
 Environment=DATA_DIR=/var/lib/defi-photo
 
 # Mot de passe admin et secret de session : dans un fichier séparé, en 600,
-# pour qu'ils n'apparaissent ni dans ce fichier ni dans `systemctl show`.
+# pour qu'ils n'apparaissent ni ici ni dans `systemctl show`.
 EnvironmentFile=/etc/defi-photo.env
 
-# `next start --port 3100`, via le script npm du projet.
-ExecStart=/usr/bin/npm run start
+# On invoque le binaire de Next directement plutôt que `npm run start` : un
+# intermédiaire npm de moins, et systemd surveille le bon processus.
+ExecStart=/usr/local/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3100
 
 Restart=always
 RestartSec=3
 
-# Le service n'écrit que dans son dossier de données.
+# Durcissement mesuré : le service n'écrit que dans son dossier de données et
+# dans le cache de Next. `ProtectHome=read-only` et non `true`, sinon Node
+# installé par nvm dans /home/ubuntu devient illisible.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/defi-photo
+ProtectHome=read-only
+ReadWritePaths=/var/lib/defi-photo /var/www/defi-photo/.next
 
 [Install]
 WantedBy=multi-user.target
