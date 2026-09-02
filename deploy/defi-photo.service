@@ -47,13 +47,17 @@ Restart=always
 RestartSec=3
 
 # Durcissement mesuré : le service n'écrit que dans son dossier de données et
-# dans le cache de Next. `ProtectHome=read-only` et non `true`, sinon Node
+# dans celui de l'app. `ProtectHome=read-only` et non `true`, sinon Node
 # installé par nvm dans /home/ubuntu devient illisible.
+#
+# ReadWritePaths vise le dossier de l'app entier, pas seulement `.next` : un
+# chemin inexistant fait échouer l'unité au démarrage (status=226/NAMESPACE),
+# et `.next` n'existe pas tant que le build n'a pas tourné.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/var/lib/defi-photo /var/www/defi-photo/.next
+ReadWritePaths=/var/lib/defi-photo /var/www/defi-photo
 
 [Install]
 WantedBy=multi-user.target

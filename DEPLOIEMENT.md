@@ -269,11 +269,39 @@ personnelles ailleurs, ni dans le dossier de build, ni en base externe.
 
 ---
 
+## Diagnostiquer un 502
+
+Un 502 signifie que le reverse proxy fonctionne — DNS et certificat compris —
+mais que rien ne répond sur `127.0.0.1:3100`. Trois commandes suffisent à
+trancher :
+
+```bash
+systemctl status defi-photo --no-pager -l   # le service tourne-t-il ?
+journalctl -u defi-photo -n 40 --no-pager   # pourquoi il est tombé
+ss -tlnp | grep 3100                        # quelqu'un écoute-t-il ?
+```
+
+`ss` doit afficher `127.0.0.1:3100`. Rien du tout : le service est mort, la
+raison est dans `journalctl`. Un autre port : le `PORT` du service ne
+correspond pas à celui du reverse proxy.
+
+Pour lire l'app en direct, hors systemd :
+
+```bash
+cd /var/www/defi-photo && npm run start
+```
+
+Les erreurs de démarrage y sont bien plus lisibles que dans le journal.
+
 ## Dépannage
 
 | Symptôme | Cause probable |
 |---|---|
-| `502 Bad Gateway` | Le service ne tourne pas : `journalctl -u defi-photo -n 50` |
+| `502 Bad Gateway` | Le proxy répond mais pas l'app. Voir le diagnostic ci-dessous. |
+| `status=203/EXEC` | `/usr/local/bin/node` absent : refaire le lien symbolique du §2 |
+| `status=226/NAMESPACE` | Un chemin de `ReadWritePaths` n'existe pas encore |
+| `Could not find a production build` | `npm run build` n'a pas tourné, ou pas dans ce dossier |
+| `Failed to load environment files` | `/etc/defi-photo.env` absent (§4) |
 | L'appareil photo ne s'ouvre pas | Pas de HTTPS. Les navigateurs l'exigent pour la caméra. |
 | Tout le monde bloqué sur `/admin/login` | `X-Forwarded-For` absent de la config du proxy (voir §6) |
 | `Error: ADMIN_PASSWORD manquant` | `/etc/defi-photo.env` absent, illisible, ou `EnvironmentFile` mal renseigné |
