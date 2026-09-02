@@ -1,0 +1,48 @@
+# Service systemd du Défi Photo.
+#
+# Installation :
+#   sudo cp deploy/defi-photo.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now defi-photo
+#
+# Adapter User, WorkingDirectory et le chemin de node à votre VPS.
+
+[Unit]
+Description=Defi Photo - mariage Meredith & Matthieu
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+
+WorkingDirectory=/var/www/defi-photo
+
+# Le serveur n'écoute que sur la boucle locale : c'est le reverse proxy qui
+# l'expose, jamais le port directement. Votre autre projet Next garde le sien.
+Environment=NODE_ENV=production
+Environment=PORT=3100
+
+# Photos, miniatures et base SQLite. Hors du dossier de build, pour survivre
+# aux redéploiements.
+Environment=DATA_DIR=/var/lib/defi-photo
+
+# Mot de passe admin et secret de session : dans un fichier séparé, en 600,
+# pour qu'ils n'apparaissent ni dans ce fichier ni dans `systemctl show`.
+EnvironmentFile=/etc/defi-photo.env
+
+# `next start --port 3100`, via le script npm du projet.
+ExecStart=/usr/bin/npm run start
+
+Restart=always
+RestartSec=3
+
+# Le service n'écrit que dans son dossier de données.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/defi-photo
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+# Bloc à ajouter à votre Caddyfile existant, à côté de votre autre projet.
+# Caddy obtient et renouvelle le certificat Let's Encrypt tout seul : rien
+# d'autre à faire une fois que mm.dubprod.fr pointe sur l'IP du VPS.
+#
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+
+mm.dubprod.fr {
+	encode zstd gzip
+
+	# Taille maximale d'un envoi. Le téléphone compresse à ~300 ko, mais une
+	# photo passée par un chemin dégradé peut arriver bien plus lourde ; la
+	# route /api/photos refuse au-delà de 12 Mo avec un message clair, autant
+	# la laisser répondre plutôt que de couper au niveau du proxy.
+	request_body {
+		max_size 15MB
+	}
+
+	reverse_proxy 127.0.0.1:3100 {
+		# Sans ça, la limitation des tentatives de connexion admin verrait
+		# toutes les requêtes venir de 127.0.0.1 et bloquerait tout le monde
+		# d'un coup. Caddy pose X-Forwarded-For par défaut ; on l'explicite
+		# pour que ça reste vrai si la config évolue.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+
+		# Envoi d'une photo sur un wifi de salle : large.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	log {
+		output file /var/log/caddy/defi-photo.log
+	}
+}

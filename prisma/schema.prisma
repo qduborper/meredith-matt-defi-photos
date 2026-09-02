@@ -1,0 +1,82 @@
+// Défi Photo — Mérédith & Matthieu, Aix-les-Bains, 5 septembre 2026.
+//
+// Les identifiants sont en anglais (contrainte Prisma : pas d'accents),
+// mais tous les libellés destinés aux invités restent en français.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Un invité. Aucun compte : un prénom saisi librement + un token UUID
+/// conservé dans le localStorage du téléphone pour le reconnaître ensuite.
+model Guest {
+  id        String   @id @default(uuid())
+  firstName String
+  /// Posé en localStorage côté client. Sert de « mot de passe » implicite :
+  /// il ne doit jamais être exposé dans une réponse publique.
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  photos Photo[]
+
+  @@index([createdAt])
+}
+
+/// Un défi photo. Entièrement éditable par l'admin, y compris pendant la soirée.
+model Challenge {
+  id           String   @id @default(uuid())
+  title        String
+  description  String   @default("")
+  category     String
+  /// Barème : 10 = facile, 20 = intermédiaire, 30 = créatif.
+  points       Int      @default(10)
+  /// Chemin d'une image d'exemple servie par /api/media, optionnelle.
+  exampleImage String?
+  active       Boolean  @default(true)
+  /// Ordre d'affichage global. Les catégories sont classées par le plus petit
+  /// `order` de leurs défis, ce qui évite un champ d'ordre séparé.
+  order        Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  photos Photo[]
+
+  @@index([active, order])
+}
+
+/// Une photo envoyée par un invité pour un défi.
+/// `status` est une String : SQLite ne supporte pas les enums Prisma.
+/// Valeurs autorisées : voir PHOTO_STATUS dans src/lib/constants.ts.
+model Photo {
+  id          String @id @default(uuid())
+  guestId     String
+  challengeId String
+
+  /// Chemins relatifs au dossier de données (hors bundle), servis via /api/media.
+  path      String
+  thumbPath String
+
+  status String @default("visible")
+  width  Int
+  height Int
+  /// Taille du fichier original en octets, pour les stats admin.
+  bytes  Int
+
+  /// Identifiant généré par le téléphone avant l'envoi. Rend l'upload
+  /// idempotent : une reprise après timeout ne crée pas de doublon.
+  clientUploadId String? @unique
+
+  createdAt DateTime @default(now())
+
+  guest     Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([guestId, challengeId])
+  @@index([challengeId])
+}

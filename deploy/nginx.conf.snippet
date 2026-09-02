@@ -1,0 +1,39 @@
+# Variante nginx, si votre VPS sert déjà votre autre projet Next avec nginx
+# plutôt qu'avec Caddy — les deux ne peuvent pas cohabiter sur les ports 80/443.
+#
+#   sudo cp deploy/nginx.conf.snippet /etc/nginx/sites-available/mm.dubprod.fr
+#   sudo ln -s /etc/nginx/sites-available/mm.dubprod.fr /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#   sudo certbot --nginx -d mm.dubprod.fr     # certificat + redirection HTTPS
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mm.dubprod.fr;
+
+    # certbot réécrit ce bloc pour rediriger vers HTTPS.
+    location / {
+        proxy_pass http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+
+        # Indispensable : sans ces en-têtes, la limitation des tentatives de
+        # connexion admin voit toutes les requêtes venir de 127.0.0.1 et
+        # bloquerait tous les visiteurs d'un seul coup.
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Envoi d'une photo depuis un wifi de salle saturé.
+        client_max_body_size 15M;
+        proxy_read_timeout   300s;
+        proxy_send_timeout   300s;
+
+        # L'export ZIP est un flux : ne pas le mettre en tampon, sinon nginx
+        # attend l'archive entière avant d'envoyer le premier octet.
+        proxy_buffering off;
+    }
+}

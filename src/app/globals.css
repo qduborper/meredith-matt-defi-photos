@@ -1,26 +1,96 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  Charte du mariage — Mérédith & Matthieu.
+  Le taupe est RÉSERVÉ à la gamification (points, badges, podium, médailles) :
+  ne pas l'utiliser pour de la décoration générique.
+*/
+@theme {
+  --color-sapin: #195352;
+  --color-sauge: #8bb2b5;
+  --color-eau: #c1d7d0;
+  --color-creme: #f8f5e5;
+  --color-taupe: #d1c4b1;
+
+  /*
+    Nuances dérivées. Les maquettes descendaient jusqu'à #9aada9 (2,1:1 sur
+    crème) pour les sous-textes : illisible, a fortiori en soirée et sur un
+    écran de téléphone incliné. On garde la douceur voulue mais on remonte
+    tout au-dessus du seuil AA (4,5:1), mesuré sur crème ET sur blanc.
+  */
+  --color-ink: #173f3e; /* 10,6:1 — texte principal */
+  --color-ink-soft: #445856; /*  6,9:1 — paragraphes, descriptions */
+  --color-ink-faint: #526664; /*  5,6:1 — mentions légales, aides */
+  --color-placeholder: #6b8180; /*  3,8:1 — texte fantôme des champs */
+  --color-surface: #ffffff;
+  --color-hairline: #eee6d6;
+  --color-danger: #b5544f;
+
+  /* Avenir Next en premier : natif sur iOS/macOS. Nunito Sans (Google Fonts)
+     prend le relais ailleurs, avec les graisses légères des sous-textes. */
+  --font-body: "Avenir Next", var(--font-nunito), "Mulish", system-ui, sans-serif;
+  --font-title: var(--font-dancing), "Dancing Script", cursive;
+
+  --radius-card: 15px;
+  --radius-panel: 18px;
+  --radius-field: 16px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/*
+  Fond de l'application : crème dominant, avec le halo doux des maquettes.
+  Pas de thème sombre : l'app doit rester identique en soirée, et le crème
+  fait office de source de lumière pour cadrer une photo.
+*/
+html {
+  color-scheme: light;
+  background-color: var(--color-creme);
+  /* Empêche iOS de grossir le texte en paysage. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #eef3ef 0%, transparent 60%),
+    var(--color-creme);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  /* Zone sûre iOS : encoche en haut, barre d'accueil en bas. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Focus clavier visible partout, jamais sur un simple clic souris. */
+:focus-visible {
+  outline: 3px solid var(--color-sapin);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Empêche le zoom automatique d'iOS à la mise au point d'un champ. */
+input,
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
+
+/* Fondu d'entrée des photos du diaporama projeté. */
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
