@@ -12,6 +12,10 @@
  * une suppression irréversible qui part toute seule est une mauvaise idée si
  * personne n'a vérifié que l'export est bien en main.
  */
+// Charge DATA_DIR depuis .env, pour ne pas dépendre d'un préfixe en ligne de
+// commande : l'oublier viserait le dossier de données par défaut, et donnerait
+// l'illusion qu'il n'y a rien à supprimer.
+import "dotenv/config";
 import fs from "node:fs/promises";
 
 import { PHOTOS_DIR, THUMBS_DIR } from "../src/lib/paths";

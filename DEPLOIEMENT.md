@@ -60,7 +60,23 @@ sudo ln -sf "$(which node)" /usr/local/bin/node
 /usr/local/bin/node --version   # doit répondre v20.9 ou plus
 ```
 
-## 3. Secrets
+## 3. Emplacement des données
+
+Créez un `.env` **dans le dossier de l'app**, avec le seul `DATA_DIR` :
+
+```bash
+cd /var/www/defi-photo
+echo 'DATA_DIR="/var/lib/defi-photo"' > .env
+```
+
+Toutes les commandes `npm run …` le lisent : plus besoin de préfixer chacune
+par `DATA_DIR=…`. Ce préfixe est un piège — l'oublier une fois crée une seconde
+base dans le dossier du projet, et l'app semble avoir perdu ses données.
+
+`.env` est ignoré par git : il reste propre au serveur et ne remontera jamais
+dans le dépôt.
+
+## 4. Secrets
 
 ```bash
 sudo tee /etc/defi-photo.env > /dev/null <<'EOF'
@@ -80,19 +96,22 @@ Le mot de passe admin est **le seul identifiant du témoin** — pas de compte, 
 d'e-mail. Changer `ADMIN_PASSWORD` puis redémarrer le service invalide
 instantanément toutes les sessions ouvertes.
 
-## 4. Service systemd
+## 5. Service systemd
+
+Vérifiez d'abord `User`, `Group` et `WorkingDirectory` dans
+`deploy/defi-photo.service` — le fichier suppose l'utilisateur `ubuntu` et
+`/var/www/defi-photo`.
 
 ```bash
 sudo cp deploy/defi-photo.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now defi-photo
-systemctl status defi-photo
+sudo systemctl enable defi-photo      # activé, mais pas encore démarré
 ```
 
-Vérifier `User`, `WorkingDirectory` et le chemin de `npm` dans le fichier avant
-de l'installer.
+On **active sans démarrer** : il n'y a rien à servir tant que le build du §7
+n'a pas tourné. Le démarrage vient là-bas.
 
-## 5. Reverse proxy
+## 6. Reverse proxy
 
 **Si vous êtes en Caddy** — ajoutez le bloc de `deploy/Caddyfile.snippet` à
 votre `Caddyfile` existant, puis :
@@ -113,14 +132,14 @@ sur les ports 80/443 : gardez celui que votre autre projet utilise déjà.
 > sixième essai raté de n'importe qui. Les deux configurations fournies les
 > posent déjà.
 
-## 6. Premier déploiement
+## 7. Premier déploiement
 
 Depuis le dossier cloné, **en utilisateur normal, sans sudo** :
 
 ```bash
 cd /var/www/defi-photo
 npm ci
-DATA_DIR=/var/lib/defi-photo npm run build
+npm run build
 ```
 
 Le build tourne **sur le serveur**, volontairement : c'est le seul moyen d'avoir
@@ -134,7 +153,7 @@ Pour les mises à jour suivantes :
 
 ```bash
 cd /var/www/defi-photo && git pull && npm ci \
-  && DATA_DIR=/var/lib/defi-photo npm run build \
+  && npm run build \
   && sudo systemctl restart defi-photo
 ```
 
@@ -144,13 +163,13 @@ cd /var/www/defi-photo && git pull && npm ci \
 Puis, une seule fois, charger les 22 défis de base :
 
 ```bash
-cd /var/www/defi-photo && DATA_DIR=/var/lib/defi-photo npm run db:seed
+cd /var/www/defi-photo && npm run db:seed
 ```
 
 Le seed est idempotent : le relancer ne duplique rien et n'écrase pas les
 modifications faites depuis la console admin.
 
-## 7. QR code
+## 8. QR code
 
 ```bash
 npm run qr https://mm.dubprod.fr
@@ -167,7 +186,7 @@ Trois fichiers dans `qr/` :
 Correction d'erreur en niveau H (30 % de redondance) : un carton de table finit
 taché, corné ou à moitié caché par un verre.
 
-## 8. Vérifications avant le jour J
+## 9. Vérifications avant le jour J
 
 ```bash
 # Le service tourne et n'écoute que sur la boucle locale
@@ -200,7 +219,7 @@ Si le réseau est mauvais, la reprise automatique fait son travail (4 tentatives
 2 s / 5 s / 10 s, avec compte à rebours affiché) — mais mieux vaut le savoir
 avant, et éventuellement prévoir un point d'accès 4G.
 
-## 9. Le jour J
+## 10. Le jour J
 
 - **Diaporama** : ouvrir `https://mm.dubprod.fr/ecran` en plein écran (F11) sur
   l'ordinateur relié au vidéoprojecteur. Aucune identification, aucune
@@ -210,7 +229,7 @@ avant, et éventuellement prévoir un point d'accès 4G.
 - Les défis restent **modifiables pendant la soirée** : en ajouter un à minuit
   fonctionne, il apparaît chez les invités au rafraîchissement suivant.
 
-## 10. Après le mariage
+## 11. Après le mariage
 
 Récupérer les photos, **puis** purger — dans cet ordre.
 
@@ -223,8 +242,8 @@ sudo tar czf ~/defi-photo-sauvegarde.tar.gz -C /var/lib defi-photo
 
 # 3. Purge, environ trois semaines après (cahier des charges §9)
 cd /var/www/defi-photo
-DATA_DIR=/var/lib/defi-photo npm run purge              # aperçu, ne supprime rien
-DATA_DIR=/var/lib/defi-photo npm run purge -- --confirmer
+npm run purge                    # aperçu, ne supprime rien
+npm run purge -- --confirmer
 
 # 4. Extinction
 sudo systemctl disable --now defi-photo
@@ -256,9 +275,11 @@ personnelles ailleurs, ni dans le dossier de build, ni en base externe.
 |---|---|
 | `502 Bad Gateway` | Le service ne tourne pas : `journalctl -u defi-photo -n 50` |
 | L'appareil photo ne s'ouvre pas | Pas de HTTPS. Les navigateurs l'exigent pour la caméra. |
-| Tout le monde bloqué sur `/admin/login` | `X-Forwarded-For` absent de la config du proxy (voir §5) |
+| Tout le monde bloqué sur `/admin/login` | `X-Forwarded-For` absent de la config du proxy (voir §6) |
 | `Error: ADMIN_PASSWORD manquant` | `/etc/defi-photo.env` absent, illisible, ou `EnvironmentFile` mal renseigné |
 | `EACCES` sur `node_modules` | Dossier cloné en root : `sudo chown -R ubuntu:ubuntu /var/www/defi-photo` |
+| `SQLITE_CANTOPEN` | `/var/lib/defi-photo` appartient à root : `sudo chown -R ubuntu:ubuntu /var/lib/defi-photo` |
+| `The table main.Challenge does not exist` | Migrations appliquées ailleurs. Créer le `.env` du §3, puis `npx prisma migrate deploy` |
 | `sudo: npm: command not found` | Node vient de nvm. Ne pas utiliser sudo pour npm (voir §2) |
 | Service `status=203/EXEC` | `/usr/local/bin/node` absent : refaire le lien symbolique du §2 |
 | Service `status=200/CHDIR` | `WorkingDirectory` ne correspond pas au dossier réellement cloné |
