@@ -16,7 +16,13 @@ import { deletePhotoFiles } from "@/lib/storage";
 
 /** Rafraîchit toutes les vues qui dépendent des photos ou des défis. */
 function revalidateEverything() {
-  for (const path of ["/admin", "/admin/galerie", "/admin/defis", "/admin/invites"]) {
+  for (const path of [
+    "/admin",
+    "/admin/galerie",
+    "/admin/defis",
+    "/admin/categories",
+    "/admin/invites",
+  ]) {
     revalidatePath(path);
   }
   // Côté invité et écran : la modération doit se voir immédiatement.
@@ -148,6 +154,70 @@ export async function moveChallenge(id: string, direction: "up" | "down"): Promi
     prisma.challenge.update({ where: { id: current.id }, data: { order: neighbour.order } }),
     prisma.challenge.update({ where: { id: neighbour.id }, data: { order: current.order } }),
   ]);
+
+  revalidateEverything();
+}
+
+/**
+ * Renomme une catégorie sur tous ses défis.
+ *
+ * Il n'y a pas de table Catégorie : une catégorie n'existe que par les défis
+ * qui la portent. Renommer, c'est donc une mise à jour groupée — et renommer
+ * vers un nom existant revient à fusionner les deux, ce qui est le
+ * comportement attendu.
+ */
+export async function renameCategory(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const from = String(formData.get("from") ?? "").trim();
+  const to = String(formData.get("to") ?? "").trim();
+  if (!from || !to || from === to) return;
+
+  await prisma.challenge.updateMany({ where: { category: from }, data: { category: to } });
+  revalidateEverything();
+}
+
+/**
+ * Déplace une catégorie entière d'un cran dans l'ordre d'affichage.
+ *
+ * Les catégories sont classées par le plus petit `order` de leurs défis. Pour
+ * en permuter deux, on échange leurs plages d'`order` en bloc, en conservant
+ * l'ordre interne de chaque catégorie.
+ */
+export async function moveCategory(category: string, direction: "up" | "down"): Promise<void> {
+  await requireAdmin();
+
+  const challenges = await prisma.challenge.findMany({
+    orderBy: { order: "asc" },
+    select: { id: true, category: true, order: true },
+  });
+
+  // Catégories dans leur ordre d'affichage, sans doublon.
+  const order: string[] = [];
+  for (const challenge of challenges) {
+    if (!order.includes(challenge.category)) order.push(challenge.category);
+  }
+
+  const index = order.indexOf(category);
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (index === -1 || target < 0 || target >= order.length) return;
+
+  [order[index], order[target]] = [order[target], order[index]];
+
+  // Renumérotation complète : c'est le seul moyen simple de garantir que les
+  // plages restent disjointes après permutation. 22 défis, une transaction.
+  const renumbered = order.flatMap((name) =>
+    challenges.filter((challenge) => challenge.category === name),
+  );
+
+  await prisma.$transaction(
+    renumbered.map((challenge, position) =>
+      prisma.challenge.update({
+        where: { id: challenge.id },
+        data: { order: (position + 1) * 10 },
+      }),
+    ),
+  );
 
   revalidateEverything();
 }

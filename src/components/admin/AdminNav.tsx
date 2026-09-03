@@ -23,6 +23,11 @@ const LINKS = [
     path: "M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9",
   },
   {
+    href: "/admin/categories",
+    label: "Catégories",
+    path: "M4 5h16M4 12h16M4 19h16M2 5h.01M2 12h.01M2 19h.01",
+  },
+  {
     href: "/admin/invites",
     label: "Invités",
     // La tête est tracée en arc : le composant ne rend qu'un seul <path>.

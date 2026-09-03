@@ -8,6 +8,7 @@ import {
   toggleChallenge,
   updateChallenge,
 } from "@/app/admin/actions";
+import { CategoryField } from "@/components/admin/CategoryField";
 import { POINTS } from "@/lib/constants";
 
 export type AdminChallenge = {
@@ -68,16 +69,7 @@ export function ChallengeRow({
             />
           </label>
 
-          <label className="text-[12px] font-bold text-sapin">
-            Catégorie
-            <input
-              name="category"
-              defaultValue={challenge.category}
-              list="admin-categories"
-              required
-              className="mt-1 w-full rounded-xl border-[1.5px] border-eau bg-surface px-3 py-2 text-[13px] font-normal text-ink"
-            />
-          </label>
+          <CategoryField categories={categories} defaultValue={challenge.category} />
 
           <label className="text-[12px] font-bold text-sapin">
             Points
@@ -91,12 +83,6 @@ export function ChallengeRow({
               <option value={POINTS.CREATIF}>{POINTS.CREATIF} — créatif</option>
             </select>
           </label>
-
-          <datalist id="admin-categories">
-            {categories.map((category) => (
-              <option key={category} value={category} />
-            ))}
-          </datalist>
 
           <div className="flex gap-2 sm:col-span-2">
             <button
@@ -169,9 +155,14 @@ export function ChallengeRow({
             challenge.active ? "bg-sapin" : "bg-[#cdd8d3]"
           }`}
         >
+          {/*
+            Curseur à droite quand c'est actif. La maquette faisait l'inverse,
+            mais aucune plateforme ne place le curseur d'un interrupteur allumé
+            à gauche : le témoin lirait l'état contraire d'un coup d'œil.
+          */}
           <span
             className={`absolute top-0.5 size-[18px] rounded-full bg-white transition-[left] ${
-              challenge.active ? "left-0.5" : "left-[18px]"
+              challenge.active ? "left-[18px]" : "left-0.5"
             }`}
           />
         </button>

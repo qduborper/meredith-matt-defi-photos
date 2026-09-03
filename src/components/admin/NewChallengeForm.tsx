@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 
 import { createChallenge } from "@/app/admin/actions";
+import { CategoryField } from "@/components/admin/CategoryField";
 import { POINTS } from "@/lib/constants";
 
 /** Ajout d'un défi, utilisable en pleine soirée (cahier des charges §6). */
@@ -67,16 +68,7 @@ export function NewChallengeForm({ categories }: { categories: string[] }) {
         />
       </label>
 
-      <label className="text-[12px] font-bold text-sapin">
-        Catégorie
-        <input
-          name="category"
-          required
-          list="new-challenge-categories"
-          defaultValue={categories[0] ?? ""}
-          className="mt-1 w-full rounded-xl border-[1.5px] border-eau px-3 py-2 text-[13px] font-normal text-ink"
-        />
-      </label>
+      <CategoryField categories={categories} />
 
       <label className="text-[12px] font-bold text-sapin">
         Points
@@ -90,12 +82,6 @@ export function NewChallengeForm({ categories }: { categories: string[] }) {
           <option value={POINTS.CREATIF}>{POINTS.CREATIF} — créatif</option>
         </select>
       </label>
-
-      <datalist id="new-challenge-categories">
-        {categories.map((category) => (
-          <option key={category} value={category} />
-        ))}
-      </datalist>
 
       <div className="flex gap-2 sm:col-span-2">
         <button
