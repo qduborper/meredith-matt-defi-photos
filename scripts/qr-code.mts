@@ -39,11 +39,17 @@ await fs.mkdir(OUT, { recursive: true });
 
 const common = { errorCorrectionLevel: "H" as const, margin: 2 };
 
+/*
+  Le fond est blanc partout, jamais transparent : posé sur du papier de
+  couleur, un QR aux modules clairs transparents laisse la teinte du papier
+  remonter, et le contraste peut tomber sous ce qu'un lecteur accepte.
+  Un aplat blanc rend le résultat indépendant du support.
+*/
 const variants = [
   { file: "qr-noir.svg", dark: "#000000", light: "#ffffff" },
-  // Sapin sur crème : 8:1 de contraste, largement au-delà de ce que demandent
-  // les lecteurs de QR, tout en restant dans la charte.
-  { file: "qr-charte.svg", dark: "#195352", light: "#F8F5E5" },
+  // Sapin sur blanc : 8,6:1, bien au-delà de ce que demandent les lecteurs,
+  // tout en restant dans la charte.
+  { file: "qr-sapin.svg", dark: "#195352", light: "#ffffff" },
 ];
 
 for (const variant of variants) {

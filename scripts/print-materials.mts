@@ -23,8 +23,17 @@ import QRCode from "qrcode";
 const run = promisify(execFile);
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const url = process.argv[2] ?? "https://mm.dubprod.fr";
+const args = process.argv.slice(2);
+
+/**
+ * `--papier-couleur` : supprime l'aplat crème du fond pour imprimer sur des
+ * feuilles teintées. Sans ça, le crème recouvre le papier et sa couleur ne
+ * sert plus à rien. Le QR garde son fond blanc dans les deux cas.
+ */
+const COLORED_PAPER = args.includes("--papier-couleur");
+const url = args.find((arg) => !arg.startsWith("--")) ?? "https://mm.dubprod.fr";
 const shortUrl = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+const suffix = COLORED_PAPER ? "-papier-couleur" : "";
 
 const ROOT = process.cwd();
 const OUT = path.join(ROOT, "print");
@@ -38,6 +47,11 @@ const logoData = `data:image/png;base64,${logo.toString("base64")}`;
  * QR en SVG inline plutôt qu'en PNG : un QR est du trait, il doit rester net
  * quelle que soit la résolution de l'imprimante.
  *
+ * Modules clairs en **blanc**, jamais transparents ni crème : sur du papier
+ * teinté, laisser remonter la couleur du support fait chuter le contraste, et
+ * certains lecteurs décrochent. Un aplat blanc rend le QR indépendant du
+ * papier sur lequel on l'imprime.
+ *
  * Niveau H (30 % de redondance) : un carton de table finit taché, corné ou à
  * moitié couvert par un verre.
  */
@@ -45,7 +59,11 @@ const qrSvg = (await QRCode.toString(url, {
   type: "svg",
   errorCorrectionLevel: "H",
   margin: 0,
-  color: { dark: "#195352", light: "#F8F5E5" },
+  color: {
+    dark: "#195352",
+    // Transparent sur papier teinté, pour la même raison que la zone tranquille.
+    light: COLORED_PAPER ? "#00000000" : "#ffffff",
+  },
 })).replace(/<\?xml.*?\?>/, "");
 
 const WAVE = `<svg class="wave" viewBox="0 0 400 26" preserveAspectRatio="none">
@@ -58,14 +76,21 @@ const BASE_CSS = `
   :root{--sapin:#195352;--sauge:#8BB2B5;--eau:#C1D7D0;--creme:#F8F5E5;--taupe:#D1C4B1;--ink:#173f3e}
   body{font-family:"Avenir Next","Nunito Sans",system-ui,sans-serif;color:var(--ink);
        -webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .card{position:relative;background:var(--creme);overflow:hidden;
+  .card{position:relative;background:${COLORED_PAPER ? "transparent" : "var(--creme)"};overflow:hidden;
         display:flex;flex-direction:column;align-items:center;text-align:center}
   .frame{position:absolute;inset:4mm;border:0.4mm solid var(--sauge);border-radius:6mm;pointer-events:none}
   .wave{position:absolute;left:0;right:0;bottom:0;width:100%;display:block}
   .logo{width:38%;height:auto}
   h1{color:var(--sapin);font-weight:700;letter-spacing:-0.01em;line-height:1.1}
   .lead{color:#445856;line-height:1.45}
-  .qr-box{border:0.35mm dashed var(--sauge);border-radius:3mm;background:var(--creme);display:grid;place-items:center}
+  /*
+    Fond blanc sur papier blanc. En mode papier de couleur on le laisse
+    transparent : une imprimante n'imprime pas de blanc, un aplat blanc sur
+    une feuille teintée ne dépose aucune encre et la couleur du papier
+    ressort de toute façon. Autant que l'aperçu montre le vrai résultat.
+  */
+  .qr-box{border:0.35mm dashed var(--sauge);border-radius:3mm;
+          background:${COLORED_PAPER ? "transparent" : "#fff"};display:grid;place-items:center}
   .qr-box svg{display:block;width:100%;height:100%}
   .scan{color:var(--sapin);font-weight:700}
   /* Le repli si le QR ne passe pas : mauvaise lumière, écran fêlé, vieux
@@ -161,7 +186,9 @@ ${BASE_CSS}
 .card .qr-box{width:54mm;height:54mm;padding:2.6mm;margin-top:7mm}
 .card .scan{font-size:4mm;margin-top:3mm}
 .card .url{font-size:4.4mm;margin-top:1.2mm}
-.card .wifi{font-size:3.6mm;margin-top:6mm;background:#EFEFE2;border-radius:4mm;padding:3.5mm 6mm}
+/* Sur papier teinté, un aplat gris masquerait la couleur : simple liseré. */
+.card .wifi{font-size:3.6mm;margin-top:6mm;border-radius:4mm;padding:3.5mm 6mm;
+  ${COLORED_PAPER ? "border:0.3mm solid var(--eau)" : "background:#EFEFE2"}}
 .card .wifi .row{display:flex;justify-content:center;gap:3mm;margin-top:1.8mm}
 .card .wifi .line{width:38mm}
 .foot{font-size:3.4mm;color:#526664;margin-top:5mm}
@@ -194,7 +221,8 @@ ${BASE_CSS}
 
 /* ------------------------------------------------------------------ rendu */
 
-async function render(name: string, html: string) {
+async function render(base: string, html: string) {
+  const name = `${base}${suffix}`;
   const htmlPath = path.join(OUT, `${name}.html`);
   const pdfPath = path.join(OUT, `${name}.pdf`);
   await fs.writeFile(htmlPath, html);
@@ -214,4 +242,7 @@ async function render(name: string, html: string) {
 await render("cartons-table", cardsHtml);
 await render("panneau-entree", signHtml);
 
-console.log(`\nSupports générés dans print/ pour ${url}`);
+console.log(
+  `\nSupports générés dans print/ pour ${url}` +
+    (COLORED_PAPER ? " — fond transparent, pour impression sur papier de couleur." : ""),
+);
