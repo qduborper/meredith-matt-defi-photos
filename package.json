@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
     "purge": "tsx --conditions=react-server scripts/purge.mts",
-    "qr": "tsx scripts/qr-code.mts"
+    "qr": "tsx scripts/qr-code.mts",
+    "print": "tsx scripts/print-materials.mts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.0",
@@ -39,6 +40,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "jsqr": "^1.4.0",
     "prisma": "^7.10.0",
     "qrcode": "^1.5.4",
     "tailwindcss": "^4",

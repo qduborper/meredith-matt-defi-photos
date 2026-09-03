@@ -49,3 +49,6 @@ next-env.d.ts
 
 # QR codes générés (regénérables avec npm run qr)
 /qr
+
+# supports imprimables générés (regénérables avec npm run print)
+/print
